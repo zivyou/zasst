@@ -1,0 +1,6 @@
+.idea/
+.venv/
+chroma_langchain.db/
+**/*.log
+data/
+**/.claude
