@@ -1,8 +1,11 @@
 import os
 import logging
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def load_api_key(model_name:str):
-    apikey=os.environ[model_name]
+    apikey=os.getenv(model_name)
     logging.warning(f"Loading API key from {apikey}")
     return apikey
 

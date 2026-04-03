@@ -1,4 +1,10 @@
+import uuid
+
+from langchain_core.globals import set_debug
+
 from agent.job_search_graph import build_job_search_graph, JobSearchState
+
+set_debug(True)
 
 
 if __name__ == '__main__':
@@ -23,7 +29,14 @@ if __name__ == '__main__':
     print("="*60)
 
     graph = build_job_search_graph()
-    result = graph.invoke(initial_state)
+    png = graph.get_graph().draw_mermaid_png()
+    with open("result.png", "wb") as f:
+        f.write(png)
+
+
+    result = graph.invoke(initial_state, config={
+        "checkpoint_id": str(uuid.uuid4()),
+    })
 
     # 输出结果
     print("\n" + "="*60)

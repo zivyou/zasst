@@ -6,11 +6,6 @@ from langchain_community.embeddings import ZhipuAIEmbeddings
 from config.apikey import ZHIPU_API_KEY
 
 
-"""
-万恶之源： pip3 install langchain-huggingface sentence_transformers
-这行命令会去huggingface下载一个embedding模型到本地来跑，这个模型部署到本地会耗费大量的存储空间和计算资源；
-后期考虑用zhipu的远程模型来替换；
-"""
 
 class Resume:
     def __init__(self, file_path: str):
@@ -32,7 +27,7 @@ class Resume:
         )
 
 
-    def query(self, query: str):
+    def query(self, query: str) -> str:
         if not self.vector_store:
             return "vector store not loaded"
         retrieved_docs = self.vector_store.similarity_search(

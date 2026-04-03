@@ -4,3 +4,5 @@ chroma_langchain.db/
 **/*.log
 data/
 **/.claude
+.env
+*/__pycache__/

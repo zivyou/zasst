@@ -2,7 +2,7 @@ from langchain.agents import create_agent
 from langchain_community.chat_models.zhipuai import ChatZhipuAI
 from langchain_core.messages import HumanMessage
 
-from agent.agent import Agent
+from demo.agent import Agent
 from demo.weather_tools import get_weather
 from tool.error_handler import handle_tool_errors
 from config.apikey import ZHIPU_API_KEY

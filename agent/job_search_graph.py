@@ -1,21 +1,25 @@
 import json
-import os
+import sqlite3
+import uuid
 from typing import TypedDict, List, Dict, Any, Optional
 
 from langchain.agents import create_agent
 from langchain_community.chat_models import ChatZhipuAI
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph, START, END
+from langgraph.graph.state import CompiledStateGraph
 from tavily import TavilyClient
 
+from config.apikey import TAVILY_API_KEY
 from config.apikey import ZHIPU_API_KEY
 from tool.error_handler import handle_tool_errors
 from tool.resume_tools import resume, get_current_date
 
-tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+tavily = TavilyClient(api_key=TAVILY_API_KEY)
 # 调用 LLM 进行匹配度评估
 model = ChatZhipuAI(
-    model="glm-4.5-air", api_key=ZHIPU_API_KEY
+    model="glm-4.7", api_key=ZHIPU_API_KEY
 )
 
 system_prompt = """你是一个专业的简历匹配专家。
@@ -261,8 +265,7 @@ def extract_score(response: str) -> int:
     return 50  # 默认值
 
 
-# ==================== Graph Building ====================
-def build_job_search_graph() -> StateGraph:
+def create_graph() -> StateGraph:
     """构建求职搜索 LangGraph"""
     graph = StateGraph(JobSearchState)
 
@@ -289,31 +292,46 @@ def build_job_search_graph() -> StateGraph:
         }
     )
     graph.add_edge("next_job", "match_job")
+    return graph
 
-    return graph.compile()
+# ==================== Graph Building ====================
+def build_job_search_graph() -> CompiledStateGraph[Any, Any, Any, Any]:
+    g = create_graph()
+    conn = sqlite3.connect("./data/checkpoint.db")
+    sqlite_checkpointer = SqliteSaver(conn)
+    return g.compile(checkpointer=sqlite_checkpointer)
 
 
-# ==================== Main Entry ====================
 if __name__ == '__main__':
-    # 初始化状态
+    # 初始化状态 - 可自定义搜索条件
     initial_state = JobSearchState(
         search_conditions={
-            "location": "北京",
-            "job_type": "后端",
-            "tech_stack": "Java"
+            "location": "北京",        # 工作地点
+            "job_type": "后端",        # 职位类型：后端/架构
+            "tech_stack": "Java"       # 技术栈
         },
         job_candidates=[],
         current_index=0,
         current_match=None,
         matched_jobs=[],
-        target_count=10,
-        match_threshold=65.0,
+        target_count=10,              # 目标结果数量
+        match_threshold=65.0,         # 匹配阈值
         completed=False
     )
 
     # 构建并运行图
+    print("🚀 开始求职搜索...")
+    print("="*60)
+
     graph = build_job_search_graph()
-    result = graph.invoke(initial_state)
+    png = graph.get_graph().draw_mermaid_png()
+    with open("job_search_graph.png", "wb") as f:
+        f.write(png)
+
+
+    result = graph.invoke(initial_state, config={
+        "checkpoint_id": str(uuid.uuid4()),
+    })
 
     # 输出结果
     print("\n" + "="*60)
