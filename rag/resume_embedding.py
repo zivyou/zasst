@@ -23,7 +23,7 @@ class Resume:
         self.vector_store = Chroma.from_documents(
             documents=chunks,
             embedding=embedding,
-            persist_directory="./chroma_langchain.db"
+            persist_directory="./data/chroma_langchain.db"
         )
 
 
