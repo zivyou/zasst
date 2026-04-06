@@ -1,12 +1,11 @@
 import asyncio
-import os
 import sys
 import time
 
 from rich.console import Console
 from rich.panel import Panel
 
-from rag.library import Library
+from rag.library import LibraryAgent
 
 
 class TuiApp:
@@ -26,7 +25,7 @@ class TuiApp:
 
         # Initialize agent
         self._console.print("[dim]Initializing agent...[/dim]")
-        library = Library(dir_path=os.getenv("LIBRARY_DIR"))
+        library = LibraryAgent()
 
         while True:
             try:
