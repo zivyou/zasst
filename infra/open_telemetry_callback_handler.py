@@ -33,6 +33,9 @@ class OpenTelemetryCallbackHandler(BaseCallbackHandler):
         span.set_attribute("langchain.run_id", uid)
         span.set_attribute("langchain.parent_run_id", parent_run_id)
 
+        prompt_char_amount = sum(len(prompt) for prompt in prompts)
+        span.set_attribute("langchain.llm.prompt_char_amount", prompt_char_amount)
+
         self._timers[uid] = time.perf_counter()
 
 
@@ -44,6 +47,11 @@ class OpenTelemetryCallbackHandler(BaseCallbackHandler):
             time_count = (time.perf_counter() - start_time) * 1000
             span.set_attribute("langchain.llm.duration_ms", time_count)
             span.set_status(StatusCode.OK)
+
+            if hasattr(response, "llm_output") and response.llm_output is not None:
+                token_usage = response.llm_output.token_usage
+                if token_usage is not None:
+                    span.set_attribute("langchain.llm.token_usage", token_usage)
 
             span.end(end_time=time.time_ns())
 
@@ -84,10 +92,13 @@ class OpenTelemetryCallbackHandler(BaseCallbackHandler):
             span = tracer.start_span(name=run_id.hex)
         self._spans[run_id.hex] = span
 
-        chain_name = serialized["name"]
+        chain_name = run_id.hex
         span.set_attribute("langchain.component", "chain")
         span.set_attribute("langchain.chain.name", chain_name)
         span.set_attribute("langchain.run_id", run_id.hex)
+
+        if isinstance(inputs, dict):
+            span.set_attribute("langchain.input_keys", str(list(inputs.keys())))
 
         self._timers[run_id.hex] = time.perf_counter()
 
@@ -100,6 +111,8 @@ class OpenTelemetryCallbackHandler(BaseCallbackHandler):
             span.set_attribute("langchain.chain.duration_ms", time_count)
             span.set_status(StatusCode.OK)
 
+            if isinstance(outputs, dict):
+                span.set_attribute("langchain.output_keys", str(list(outputs.keys())))
             span.end(end_time=time.time_ns())
 
     def on_chain_error(self, error: BaseException, *, run_id: UUID, parent_run_id: UUID | None = None,

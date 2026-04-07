@@ -13,7 +13,6 @@ from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langgraph.checkpoint.memory import InMemorySaver
 
 from config.apikey import ZHIPU_API_KEY
 from infra.open_telemetry_callback_handler import OpenTelemetryCallbackHandler
@@ -53,7 +52,6 @@ class Library:
                           "intent": "..."
                         }
                     """,
-            checkpointer=InMemorySaver(),
             # ChatZhipuAI不支持response_format!!
             # response_format=Response
         )
