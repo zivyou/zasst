@@ -5,6 +5,6 @@ chroma_langchain.db/
 data/
 **/.claude
 .env
-*/__pycache__/
+**/__pycache__/
 __pycache__
 zasst_library.db
