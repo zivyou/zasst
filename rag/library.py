@@ -10,16 +10,19 @@ from langchain_community.chat_models import ChatZhipuAI
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.embeddings import ZhipuAIEmbeddings
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.checkpoint.memory import InMemorySaver
 
 from config.apikey import ZHIPU_API_KEY
+from infra.open_telemetry_callback_handler import OpenTelemetryCallbackHandler
 
 model = ChatZhipuAI(
     model="glm-4.7", api_key=ZHIPU_API_KEY
 )
 
+otel_handler = OpenTelemetryCallbackHandler()
 
 class Library:
     def __init__(self, dir_path: str | None, session_id=str(uuid.uuid4())) -> None:
@@ -42,7 +45,8 @@ class Library:
                         3. 从不同角度覆盖用户需求（原理、实现、应用场景）；
                         4. 用英文和中文各生成一个版本；
 
-                        输出格式： 严格输出一个json字符串，JSON示例如下，确保你的JSON格式正确无误，可以直接被程序解析。不要在JSON前后添加任何说明或附加文本：  
+                        输出格式： 严格输出一个json字符串，JSON示例如下，确保你的JSON格式正确无误，可以直接被程序解析。
+                        请返回一个纯文本的JSON格式，不包含任何额外的标记或者格式化符号，如代码块标记(```)，不要在JSON前后添加任何说明或附加文本：
                         {
                           "queries": {"zh": "...", "en": "..."},
                           "keywords": ["...", "..."],
@@ -111,6 +115,7 @@ class Library:
     def _generate_rag_query(self, query: str) -> tuple[str, str]:
         response = self._rag_query_generator.invoke(
             input={"messages": [HumanMessage(f"用户问题：{query}")]},
+            config=RunnableConfig(callbacks=[otel_handler])
         )
         content = response["messages"][-1].content
         content = json.loads(content)
@@ -149,7 +154,8 @@ class LibraryAgent:
 
     async def ask(self, question: str) -> str:
         response = await self.agent.ainvoke(
-            input={"messages": [HumanMessage(question)]}
+            input={"messages": [HumanMessage(question)]},
+            config=RunnableConfig(callbacks=[otel_handler])
         )
         return response["messages"][-1].content
 
