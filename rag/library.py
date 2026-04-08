@@ -18,23 +18,28 @@ from config.apikey import ZHIPU_API_KEY
 from infra.open_telemetry_callback_handler import OpenTelemetryCallbackHandler
 
 model = ChatZhipuAI(
-    model="glm-4.7", api_key=ZHIPU_API_KEY
+    model="glm-4.7", api_key=ZHIPU_API_KEY,
 )
 
 otel_handler = OpenTelemetryCallbackHandler()
 
 class Library:
-    def __init__(self, dir_path: str | None, session_id=str(uuid.uuid4())) -> None:
+    def __init__(self, dir_path: str | None) -> None:
         if dir_path:
             self._index_pdfs(dir_path)
         embedding = ZhipuAIEmbeddings(model="embedding-3", api_key=ZHIPU_API_KEY)
         self._vector_store = Chroma(persist_directory="./data/zasst_library.db", embedding_function=embedding)
-        self._rag_query_generator = self._init_rag_query_generator(session_id)
+        self._rag_query_generator = self._init_rag_query_generator()
+        self._rag_thread_id = uuid.uuid4().hex
 
 
-    def _init_rag_query_generator(self, session_id):
+    def _init_rag_query_generator(self):
+        # glm 4.7限制连接数为2, 如果都使用glm 4.7可能会导致超时。所以这里用来改写rag查询条件的模型就用glm-4.5-air了。
+        query_optimization_model = ChatZhipuAI(
+            model="glm-4.5-air", api_key=ZHIPU_API_KEY,
+        )
         agent = create_agent(
-            model=model,
+            model=query_optimization_model,
             system_prompt="""
                         你是一个专业的搜索查询优化专家。
 
@@ -113,7 +118,7 @@ class Library:
     def _generate_rag_query(self, query: str) -> tuple[str, str]:
         response = self._rag_query_generator.invoke(
             input={"messages": [HumanMessage(f"用户问题：{query}")]},
-            config=RunnableConfig(callbacks=[otel_handler])
+            config=RunnableConfig(callbacks=[otel_handler], configurable={"thread_id": self._rag_thread_id})
         )
         content = response["messages"][-1].content
         content = json.loads(content)

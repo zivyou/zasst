@@ -31,7 +31,7 @@ class OpenTelemetryCallbackHandler(BaseCallbackHandler):
         span.set_attribute("langchain.component", "llm")
         span.set_attribute("langchain.llm.name", llm_name)
         span.set_attribute("langchain.run_id", uid)
-        span.set_attribute("langchain.parent_run_id", parent_run_id)
+        span.set_attribute("langchain.parent_run_id", parent_run_id.hex)
 
         prompt_char_amount = sum(len(prompt) for prompt in prompts)
         span.set_attribute("langchain.llm.prompt_char_amount", prompt_char_amount)
@@ -47,11 +47,12 @@ class OpenTelemetryCallbackHandler(BaseCallbackHandler):
             time_count = (time.perf_counter() - start_time) * 1000
             span.set_attribute("langchain.llm.duration_ms", time_count)
             span.set_status(StatusCode.OK)
+            keys = str(response.llm_output.keys())
+            span.set_attribute("langchain.llm.output_keys", keys)
 
             if hasattr(response, "llm_output") and response.llm_output is not None:
-                token_usage = response.llm_output.token_usage
-                if token_usage is not None:
-                    span.set_attribute("langchain.llm.token_usage", token_usage)
+                # WARNING:langchain_core.callbacks.manager:Error in OpenTelemetryCallbackHandler.on_llm_end callback: AttributeError("'dict' object has no attribute 'token_usage'")
+                span.set_attribute("langchain.llm.llm_ouput", str(response.llm_output))
 
             span.end(end_time=time.time_ns())
 
@@ -92,7 +93,12 @@ class OpenTelemetryCallbackHandler(BaseCallbackHandler):
             span = tracer.start_span(name=run_id.hex)
         self._spans[run_id.hex] = span
 
-        chain_name = run_id.hex
+        if kwargs is not None and kwargs["name"] is not None:
+            chain_name = kwargs["name"]
+            for key, value in kwargs.items():
+                span.set_attribute(key, value)
+        else:
+            chain_name = run_id.hex
         span.set_attribute("langchain.component", "chain")
         span.set_attribute("langchain.chain.name", chain_name)
         span.set_attribute("langchain.run_id", run_id.hex)
