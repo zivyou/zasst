@@ -25,10 +25,10 @@ otel_handler = OpenTelemetryCallbackHandler()
 
 class Library:
     def __init__(self, dir_path: str | None) -> None:
-        if dir_path:
-            self._index_pdfs(dir_path)
         embedding = ZhipuAIEmbeddings(model="embedding-3", api_key=ZHIPU_API_KEY)
         self._vector_store = Chroma(persist_directory="./data/zasst_library.db", embedding_function=embedding)
+        if dir_path:
+            self._index_pdfs(dir_path)
         self._rag_query_generator = self._init_rag_query_generator()
         self._rag_thread_id = uuid.uuid4().hex
 
@@ -64,10 +64,10 @@ class Library:
 
     def _index_pdfs(self, dir_path: str) -> None:
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=350,
+            chunk_size=500,
             chunk_overlap=50,
             length_function=len,
-            separators=["\n\n", "\n", "。", "；", ";", ".", ","]
+            separators=["\n\n", "\n"]
         )
         root = Path(dir_path)
         pdfs = list(root.glob("**/*.pdf"))
