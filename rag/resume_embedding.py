@@ -1,3 +1,6 @@
+"""resume RAG agent"""
+from dataclasses import dataclass
+
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -6,8 +9,9 @@ from langchain_community.embeddings import ZhipuAIEmbeddings
 from config.apikey import ZHIPU_API_KEY
 
 
-
+@dataclass
 class Resume:
+    """resume RAG agent"""
     def __init__(self, file_path: str):
         self.file_path = file_path
         splitter = RecursiveCharacterTextSplitter(
@@ -28,6 +32,7 @@ class Resume:
 
 
     def query(self, query: str) -> str:
+        """query data from vector store"""
         if not self.vector_store:
             return "vector store not loaded"
         retrieved_docs = self.vector_store.similarity_search(
@@ -39,10 +44,3 @@ class Resume:
             for doc in retrieved_docs
         )
         return serialized
-
-
-    def ask(self, question: str):
-        if not self.vector_store:
-            return "vector store not loaded"
-
-

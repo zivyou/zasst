@@ -1,15 +1,17 @@
+"""zasst tui app"""
 import asyncio
 import sys
 import time
+from dataclasses import dataclass
 
 from rich.console import Console
 from rich.panel import Panel
 
 from rag.library import LibraryAgent
 
-
+@dataclass
 class TuiApp:
-
+    """Tui app"""
     def __init__(self):
         self._tool_count = 0
         self._session_start = time.time()
@@ -20,6 +22,7 @@ class TuiApp:
         }
 
     def run(self) -> None:
+        """Run the app"""
         self._console.clear()
         self._print_welcome()
 
@@ -102,7 +105,6 @@ class TuiApp:
         mins, secs = divmod(elapsed, 60)
         time_str = f"{mins}m{secs:02d}s" if mins else f"{secs}s"
 
-        usage = "type anything you want"
         # total_tokens = usage["total_input_tokens"] + usage["total_output_tokens"]
         total_tokens = 1001
         if total_tokens > 1000:
@@ -114,18 +116,18 @@ class TuiApp:
         cost = 1000
 
         line1 = f"    branch:{branch}"
-        line2 = f"    {"glm"} | session:{time_str} | tokens:{token_str} | ${cost:.4f} | 🔧{self._tool_count}"
+        line2 = (f"    glm | session:{time_str} | tokens:{token_str}"
+                 f" | ${cost:.4f} | 🔧{self._tool_count}")
         return [line1, line2]
 
     def _handle_slash_command(self, user_input: str) -> None:
         args: list[str] = user_input.split()[1:]
         if self._default_slash_cmds.get(user_input) is not None:
             self._default_slash_cmds[user_input](args)
-            return
 
 
 
-    def _handle_help(self, args: list) -> None:
+    def _handle_help(self) -> None:
         self._console.print(
             Panel(
                 "[bold]Commands:[/bold]\n"
@@ -141,4 +143,3 @@ class TuiApp:
                 border_style="blue",
             )
         )
-

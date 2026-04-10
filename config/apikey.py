@@ -1,3 +1,4 @@
+"""llm api keys"""
 import os
 import logging
 from dotenv import load_dotenv
@@ -5,8 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def load_api_key(model_name:str):
+    """load api key from env"""
     apikey=os.getenv(model_name)
-    logging.warning(f"Loading API key from {apikey}")
+    logging.warning("Loading API key from %s", apikey)
     return apikey
 
 

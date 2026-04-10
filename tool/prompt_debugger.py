@@ -1,12 +1,17 @@
+"""
+debug prompt middleware
+"""
 import json
 import os
+import logging
 from typing import Callable
 
 from langchain.agents.middleware import ModelRequest, ModelResponse, wrap_model_call
 
-import logging
+
 
 def setup_logger(file_path:str, level=logging.DEBUG) -> logging.Logger:
+    """setup logger"""
     log_dir = os.path.dirname(file_path)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
@@ -34,6 +39,6 @@ def debug_prompt(
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
 ) -> ModelResponse:
-    logger.debug(f"request: {json.dumps(request.messages, indent=4)}")
+    """prompt debugger"""
+    logger.debug("request: %s", json.dumps(request.messages, indent=4))
     return handler(request)
-

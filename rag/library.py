@@ -1,3 +1,4 @@
+"""RAG library agent"""
 import json
 import os
 import sqlite3
@@ -6,6 +7,7 @@ from binascii import crc32
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from attr import dataclass
 from langchain.agents import create_agent
 from langchain_chroma import Chroma
 from langchain_community.chat_models import ChatZhipuAI
@@ -33,13 +35,17 @@ DBS = 10
 def _db_sharding(file_name: str) -> int:
     return crc32(file_name.encode("utf-8")) % DBS
 
-
+@dataclass
 class Library:
+    """library, init from local pdf documents"""
     def __init__(self, dir_path: str | None) -> None:
         self._vector_stores = []
         for i in range(0, DBS):
             embedding = ZhipuAIEmbeddings(model="embedding-3", api_key=ZHIPU_API_KEY)
-            _vector_store = Chroma(persist_directory=f"./data/zasst_library_{i}.db", embedding_function=embedding)
+            _vector_store = Chroma(
+                persist_directory=f"./data/zasst_library_{i}.db",
+                embedding_function=embedding
+            )
             self._vector_stores.append(_vector_store)
         if dir_path:
             self._index_pdfs(dir_path)
@@ -89,11 +95,14 @@ class Library:
         with sqlite3.connect("./data/library_menus.db") as connection:
             cursor = connection.cursor()
             cursor.execute(
-                "create table if not exists menu(id integer primary key autoincrement, file_name varchar(256), db_index int, file_update_time timestamp)")
+                "create table if not exists "
+                "menu(id integer primary key autoincrement, file_name varchar(256),"
+                " db_index int, file_update_time timestamp)")
             connection.commit()
             for pdf in pdfs:
                 modification_time = os.path.getmtime(pdf)
-                menu = cursor.execute("select * from menu where file_name=?", (pdf.name,)).fetchone()
+                menu = cursor.execute("select * from menu where file_name=?", (pdf.name,)
+                                      ).fetchone()
                 connection.commit()
                 if menu is None or menu[3] < modification_time:
                     docs = PyMuPDFLoader(pdf).load()
@@ -106,7 +115,9 @@ class Library:
                         )
                     if menu is None:
                         cursor.execute(
-                            "insert into menu(file_name, file_update_time, db_index) values (?, ?, ?)", (pdf.name, modification_time, db_index)
+                            "insert into menu(file_name, file_update_time, db_index) "
+                            "values (?, ?, ?)",
+                            (pdf.name, modification_time, db_index)
                         )
                         connection.commit()
 
@@ -124,13 +135,16 @@ class Library:
         return zh_docs, en_docs
 
     def query(self, query: str) -> str:
+        """concurrent vector retrive from Chroma"""
         if not self._vector_stores or len(self._vector_stores) <= 0:
             return "vector store not loaded"
         zh, en = self._generate_rag_query(query)
         with ThreadPoolExecutor(max_workers=DBS) as executor:
             futures = []
             for i in range(0, DBS):
-                futures.append(executor.submit(self._query, vector_store=self._vector_stores[i], zh=zh, en=en))
+                futures.append(
+                    executor.submit(self._query, vector_store=self._vector_stores[i], zh=zh, en=en)
+                )
             results = as_completed(futures)
             docs = []
             for result in results:
@@ -150,7 +164,8 @@ class Library:
     def _generate_rag_query(self, query: str) -> tuple[str, str]:
         response = self._rag_query_generator.invoke(
             input={"messages": [HumanMessage(f"用户问题：{query}")]},
-            config=RunnableConfig(callbacks=[otel_handler], configurable={"thread_id": self._rag_thread_id})
+            config=RunnableConfig(callbacks=[otel_handler],
+                                  configurable={"thread_id": self._rag_thread_id})
         )
         content = response["messages"][-1].content
         content = json.loads(content)
@@ -169,10 +184,12 @@ def research(question:str) -> str:
     """
     return library.query(question)
 
-
+@dataclass
 class LibraryAgent:
+    """library agent"""
+
     def __init__(self):
-        system_prompt = f"""
+        system_prompt = """
         你是一个专业的科研助手，严格的使用ReAct模式来工作。
         你必须严格的按照 思考->行动->观察 这个循环来进行推理和行动，思考->行动->观察这个流程可以重复多次，最多重复10次。
 
@@ -188,10 +205,9 @@ class LibraryAgent:
         )
 
     async def ask(self, question: str) -> str:
+        """talk to the library agent"""
         response = await self.agent.ainvoke(
             input={"messages": [HumanMessage(question)]},
             config=RunnableConfig(callbacks=[otel_handler])
         )
         return response["messages"][-1].content
-
-

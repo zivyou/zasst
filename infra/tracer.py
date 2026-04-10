@@ -1,3 +1,4 @@
+"""open-telemetry setup"""
 import os
 
 from opentelemetry import trace, metrics
