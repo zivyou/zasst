@@ -2,6 +2,8 @@ import json
 import os
 import sqlite3
 import uuid
+from binascii import crc32
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from langchain.agents import create_agent
@@ -9,6 +11,8 @@ from langchain_chroma import Chroma
 from langchain_community.chat_models import ChatZhipuAI
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.embeddings import ZhipuAIEmbeddings
+from langchain_community.retrievers import BM25Retriever
+from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
@@ -23,10 +27,20 @@ model = ChatZhipuAI(
 
 otel_handler = OpenTelemetryCallbackHandler()
 
+DBS = 10
+
+
+def _db_sharding(file_name: str) -> int:
+    return crc32(file_name.encode("utf-8")) % DBS
+
+
 class Library:
     def __init__(self, dir_path: str | None) -> None:
-        embedding = ZhipuAIEmbeddings(model="embedding-3", api_key=ZHIPU_API_KEY)
-        self._vector_store = Chroma(persist_directory="./data/zasst_library.db", embedding_function=embedding)
+        self._vector_stores = []
+        for i in range(0, DBS):
+            embedding = ZhipuAIEmbeddings(model="embedding-3", api_key=ZHIPU_API_KEY)
+            _vector_store = Chroma(persist_directory=f"./data/zasst_library_{i}.db", embedding_function=embedding)
+            self._vector_stores.append(_vector_store)
         if dir_path:
             self._index_pdfs(dir_path)
         self._rag_query_generator = self._init_rag_query_generator()
@@ -75,44 +89,62 @@ class Library:
         with sqlite3.connect("./data/library_menus.db") as connection:
             cursor = connection.cursor()
             cursor.execute(
-                "create table if not exists menu(id integer primary key autoincrement, file_name varchar(256), file_update_time timestamp)")
+                "create table if not exists menu(id integer primary key autoincrement, file_name varchar(256), db_index int, file_update_time timestamp)")
             connection.commit()
             for pdf in pdfs:
                 modification_time = os.path.getmtime(pdf)
                 menu = cursor.execute("select * from menu where file_name=?", (pdf.name,)).fetchone()
                 connection.commit()
-                if menu is None or menu[2] < modification_time:
+                if menu is None or menu[3] < modification_time:
                     docs = PyMuPDFLoader(pdf).load()
                     chunks = splitter.split_documents(docs)
+                    db_index = _db_sharding(file_name=pdf.name)
                     # 一次存储的chunks不能超过64条；
                     for i in range(0, len(chunks), 60):
-                        self._vector_store.add_documents(
+                        self._vector_stores[db_index].add_documents(
                             documents=chunks[i:i + 60],
                         )
                     if menu is None:
                         cursor.execute(
-                            "insert into menu(file_name, file_update_time) values (?, ?)", (pdf.name, modification_time)
+                            "insert into menu(file_name, file_update_time, db_index) values (?, ?, ?)", (pdf.name, modification_time, db_index)
                         )
                         connection.commit()
 
+    def _query(self, vector_store, zh: str, en: str) -> tuple[list[Document], list[Document]]:
+        retrieved_zh_docs = vector_store.similarity_search(
+            query=zh,
+            k=10
+        )
+        zh_docs = BM25Retriever.from_documents(retrieved_zh_docs).invoke(input=zh)
+        retrieved_en_docs = vector_store.similarity_search(
+            query=en,
+            k=10
+        )
+        en_docs = BM25Retriever.from_documents(retrieved_en_docs).invoke(input=en)
+        return zh_docs, en_docs
+
     def query(self, query: str) -> str:
-        if not self._vector_store:
+        if not self._vector_stores or len(self._vector_stores) <= 0:
             return "vector store not loaded"
         zh, en = self._generate_rag_query(query)
-        retrieved_zh_docs = self._vector_store.similarity_search(
-            query=zh,
-            k=3
-        )
-        retrieved_en_docs = self._vector_store.similarity_search(
-            query=en,
-            k=3
-        )
-        retrieved_docs = retrieved_zh_docs + retrieved_en_docs
-        serialized = "\n\n".join(
-            (f"Source: {doc.metadata}\nContent: {doc.page_content}")
-            for doc in retrieved_docs
-        )
-        return serialized
+        with ThreadPoolExecutor(max_workers=DBS) as executor:
+            futures = []
+            for i in range(0, DBS):
+                futures.append(executor.submit(self._query, vector_store=self._vector_stores[i], zh=zh, en=en))
+            results = as_completed(futures)
+            docs = []
+            for result in results:
+                docs+=(result.result()[0])
+                docs+=(result.result()[1])
+            # serialized = "\n\n".join(
+            #     (f"Source: {doc.metadata}\nContent: {doc.page_content}")
+            #     for doc in docs
+            # )
+            serialized = "\n\n".join(
+                f"Content: {doc.page_content}"
+                for doc in docs
+            )
+            return serialized
 
 
     def _generate_rag_query(self, query: str) -> tuple[str, str]:
