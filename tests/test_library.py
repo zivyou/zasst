@@ -4,10 +4,7 @@ author: zivyou
 import os
 import time
 import unittest
-import dotenv
 from rag.library import Library
-
-dotenv.load_dotenv()
 
 
 
@@ -15,7 +12,7 @@ class MyTestCase(unittest.TestCase):
     """ library test cases """
     def test_something(self):
         """ test library """
-        library = Library(os.getenv("LIBRARY_DIR"))
+        library = Library("/home/ziv/Documents/library")
         start = time.time()
         content = library.query("volatile 可见性 happens-before")
         end = time.time()

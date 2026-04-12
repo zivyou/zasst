@@ -7,6 +7,7 @@ from binascii import crc32
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+import dotenv
 from attr import dataclass
 from langchain.agents import create_agent
 from langchain_chroma import Chroma
@@ -35,7 +36,7 @@ DBS = 10
 def _db_sharding(file_name: str) -> int:
     return crc32(file_name.encode("utf-8")) % DBS
 
-@dataclass
+
 class Library:
     """library, init from local pdf documents"""
     def __init__(self, dir_path: str | None) -> None:

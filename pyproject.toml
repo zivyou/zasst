@@ -23,3 +23,9 @@ dependencies = [
     "tavily>=1.1.0",
     "zhipuai>=2.1.5.20250825",
 ]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9.0.3",
+]
+
