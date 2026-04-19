@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from rich.console import Console
 from rich.panel import Panel
 
-from agent.library_agent import LibraryAgent
+from agent.supervisor_agent import SupervisorAgent
 
 
 @dataclass
@@ -33,7 +33,7 @@ class TuiApp:
 
         # Initialize agent
         self._console.print("[dim]Initializing agent...[/dim]")
-        library = LibraryAgent()
+        agent = SupervisorAgent()
 
         while self._loop:
             try:
@@ -44,8 +44,8 @@ class TuiApp:
                 if user_input.startswith("/"):
                     self._handle_slash_command(user_input)
                     continue
-                loop = asyncio.new_event_loop()
-                answer = loop.run_until_complete(library.ask(user_input))
+
+                answer = (agent.execute(user_input))
                 self._console.print(
                     Panel(
                         title="library answer",
@@ -53,7 +53,6 @@ class TuiApp:
                         renderable=answer,
                     )
                 )
-                loop.close()
             except (EOFError, KeyboardInterrupt):
                 print("error")
                 raise

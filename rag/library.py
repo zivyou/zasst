@@ -5,7 +5,9 @@ import sqlite3
 import uuid
 from binascii import crc32
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, List
 
 from langchain.agents import create_agent
 from langchain_chroma import Chroma
@@ -20,10 +22,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from config.apikey import ZHIPU_API_KEY
 from infra.open_telemetry_callback_handler import OpenTelemetryCallbackHandler
-
-model = ChatZhipuAI(
-    model="glm-4.7", api_key=ZHIPU_API_KEY,
-)
 
 otel_handler = OpenTelemetryCallbackHandler()
 
@@ -52,6 +50,11 @@ class Library:
 
 
     def _init_rag_query_generator(self):
+        @dataclass
+        class Response:
+            queries: Dict[str, str]
+            keywords: List[str]
+            intent: str
         # glm 4.7限制连接数为2, 如果都使用glm 4.7可能会导致超时。所以这里用来改写rag查询条件的模型就用glm-4.5-air了。
         query_optimization_model = ChatZhipuAI(
             model="glm-4.5-air", api_key=ZHIPU_API_KEY,
@@ -68,15 +71,15 @@ class Library:
                         4. 用英文和中文各生成一个版本；
 
                         输出格式： 严格输出一个json字符串，JSON示例如下，确保你的JSON格式正确无误，可以直接被程序解析。
-                        请返回一个纯文本的JSON格式，不包含任何额外的标记或者格式化符号，如代码块标记(```)，不要在JSON前后添加任何说明或附加文本：
                         {
                           "queries": {"zh": "...", "en": "..."},
                           "keywords": ["...", "..."],
                           "intent": "..."
                         }
+                        字符串中不允许出现```json，不要在JSON前后添加任何说明或附加文本：
                     """,
             # ChatZhipuAI不支持response_format!!
-            # response_format=Response
+            # response_format=ToolStrategy(Response)
         )
         return agent
 

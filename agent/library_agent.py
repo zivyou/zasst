@@ -1,10 +1,15 @@
 from langchain.agents import create_agent
+from langchain_community.chat_models import ChatZhipuAI
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 
-from rag.library import model, otel_handler
+from config.apikey import ZHIPU_API_KEY
+from rag.library import otel_handler
 from tool.library_research import research
 
+model = ChatZhipuAI(
+    model="glm-4.7", api_key=ZHIPU_API_KEY,
+)
 
 class LibraryAgent:
     """library agent"""
