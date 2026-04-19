@@ -1,5 +1,6 @@
 """zasst tui app"""
 import asyncio
+import shutil
 import sys
 import time
 from dataclasses import dataclass
@@ -17,8 +18,11 @@ class TuiApp:
         self._session_start = time.time()
         self._agent = None
         self._console = Console()
+        self._loop = True
         self._default_slash_cmds = {
-            "/help": self._handle_help
+            "/help": self._handle_help,
+            "/quit": self._handle_quit,
+            "/exit": self._handle_quit,
         }
 
     def run(self) -> None:
@@ -30,7 +34,7 @@ class TuiApp:
         self._console.print("[dim]Initializing agent...[/dim]")
         library = LibraryAgent()
 
-        while True:
+        while self._loop:
             try:
                 user_input = self._get_input()
                 if (not user_input) or (not user_input.strip()):
@@ -73,8 +77,9 @@ class TuiApp:
             branch:master
             claude-opus-4-6 | session:24s | ... | 🔧3
         """
-        sep = "─" * 40
-        status_lines = self._build_status_lines()
+        term_size = shutil.get_terminal_size()
+        sep = "─" * (term_size.columns - 4)  # 考虑到前导空格
+        status_lines = self._build_status_lines(term_size)
         # Pre-print: top sep, prompt, bottom sep, status bar
         # Then move cursor back up to the prompt line
         lines_below = 1 + len(status_lines)  # bottom sep + status lines
@@ -98,7 +103,7 @@ class TuiApp:
         sys.stdout.flush()
         return user_input
 
-    def _build_status_lines(self) -> list[str]:
+    def _build_status_lines(self, term_size: shutil.os.terminal_size) -> list[str]:
         """Build the status bar text lines (plain strings for pre-printing)."""
         branch = "no-git"
         elapsed = int(time.time() - self._session_start)
@@ -127,7 +132,7 @@ class TuiApp:
 
 
 
-    def _handle_help(self) -> None:
+    def _handle_help(self, args: list[str]) -> None:
         self._console.print(
             Panel(
                 "[bold]Commands:[/bold]\n"
@@ -138,8 +143,12 @@ class TuiApp:
                 "  /mcp      - Show MCP server status\n"
                 "  /clear    - Clear screen\n"
                 "  /compact  - Reset conversation\n"
-                "  /exit     - Exit",
+                "  /quit     - Exit",
                 title="Help",
                 border_style="blue",
             )
         )
+
+    def _handle_quit(self, args: list[str]) -> None:
+        self._console.print("Bye!", style="green")
+        self._loop = False
