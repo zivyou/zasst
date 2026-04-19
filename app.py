@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from rich.console import Console
 from rich.panel import Panel
 
-from rag.library import LibraryAgent
+from agent.library_agent import LibraryAgent
+
 
 @dataclass
 class TuiApp:
